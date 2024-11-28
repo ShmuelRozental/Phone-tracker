@@ -1,4 +1,7 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
+from neo4j_driver import get_driver
+from dao.device import DeviceRepository
+
 
 
 phone_blueprint = Blueprint('phone_tracker', __name__)
@@ -17,7 +20,9 @@ def get_interaction():
             device_1 = data[0]
             device_2 = data[1]
             interaction = data[2]
-        
+            device_repo = DeviceRepository(get_driver())
+
+            result = device_repo.create_device_and_interaction(device_1, device_2, interaction)
             return jsonify({
                 "message": "Data processed successfully",
                 "device_1": device_1,
