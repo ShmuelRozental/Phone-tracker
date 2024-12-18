@@ -1,39 +1,49 @@
 from flask import Blueprint, request, jsonify, current_app
 from neo4j_driver import get_driver
 from dao.device import DeviceRepository
-
-
+from neo4j.exceptions import ServiceUnavailable, CypherTypeError
 
 phone_blueprint = Blueprint('phone_tracker', __name__)
-
 
 @phone_blueprint.route("/api/phone_tracker", methods=['POST'])
 def get_interaction():
     data = request.json
+    current_app.logger.debug(f"Received data: {data}") 
+
     if not data:
         return jsonify({"error": "Invalid payload"}), 400
-    
 
-    if isinstance(data, list):
-        try:
+    if "devices" not in data or "interaction" not in data:
+        return jsonify({"error": "Missing required keys: 'devices' and/or 'interaction'"}), 400
 
-            device_1 = data[0]
-            device_2 = data[1]
-            interaction = data[2]
-            device_repo = DeviceRepository(get_driver())
+    try:
+        device_1 = data["devices"][0]
+        device_2 = data["devices"][1]
+        interaction = data["interaction"]
+        
+        current_app.logger.debug(f"Device 1: {device_1}, Device 2: {device_2}, Interaction: {interaction}")
 
-            result = device_repo.create_device_and_interaction(device_1, device_2, interaction)
-            return jsonify({
-                "message": "Data processed successfully",
-                "device_1": device_1,
-                "device_2": device_2
-            }), 200
+        if isinstance(interaction, dict):
+            interaction = {k: v if isinstance(v, (int, float, str)) else None for k, v in interaction.items()}
 
-        except IndexError as e:
-            return jsonify({"error": "Devices list is incomplete"}), 400
-    else:
-        return jsonify({"error": "Invalid data format, expected a list"}), 400
+        current_app.logger.debug(f"Processed interaction: {interaction}")
 
+
+        device_repo = DeviceRepository(get_driver())
+        result = device_repo.create_device_and_interaction(device_1, device_2, interaction)
+        
+
+        current_app.logger.debug(f"Database result: {result}")
+
+        return jsonify({
+            "message": "Data processed successfully",
+            "device_1": device_1,
+            "device_2": device_2
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Error processing request: {e}")
+        return jsonify({"error": "Server error"}), 500
 
 
 
